@@ -1,0 +1,33 @@
+name: QA
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: JavaScript syntax
+        run: |
+          node --check app.js
+          node --check sw.js
+      - name: Required PWA assets
+        run: |
+          test -s index.html
+          test -s styles.css
+          test -s app.js
+          test -s sw.js
+          test -s manifest.webmanifest
+          test -s icon.svg
+      - name: App smoke assertions
+        run: |
+          grep -q "render();" app.js
+          grep -q "renderEditWorkout" app.js
+          grep -q "Chest-supported dumbbell rear-delt raise" app.js
+          ! grep -q "High-cable rear-delt fly" app.js
