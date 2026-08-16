@@ -13,7 +13,7 @@ const B=[
   ['dip','Weighted dip',6,10,'added load','compound',180],
   ['row','Low-cable seated row',6,10,'stack','compound',180],
   ['ohp','Seated dumbbell overhead press',6,10,'per dumbbell','compound',180],
-  ['rear','High-cable rear-delt fly',12,20,'stack','iso',120],
+  ['rear','Chest-supported dumbbell rear-delt raise',12,20,'per dumbbell','iso',120],
   ['biceps','Low-cable curl',8,12,'stack','iso',120]
 ];
 const R={A,B};
@@ -28,7 +28,7 @@ const cues={
   dip:'Moderate forward lean. Stop before bouncing out of the bottom.',
   row:'Let scapula protract, then pull elbows toward lower ribs.',
   ohp:'Bench one notch below vertical. Neutral/semi-neutral grip.',
-  rear:'Sweep outward without rotating torso.',
+  rear:'Chest supported on a low incline. Sweep arms out and slightly back; stop before shrugging or swinging.',
   biceps:'Keep elbows beside/behind torso; no backward lean.'
 };
 const howto={
@@ -42,7 +42,7 @@ const howto={
   dip:'weighted dips proper form tutorial',
   row:'seated cable row proper form tutorial',
   ohp:'seated dumbbell shoulder press proper form tutorial',
-  rear:'cable rear delt fly proper form tutorial',
+  rear:'chest supported dumbbell rear delt raise proper form tutorial',
   biceps:'cable curl proper form tutorial'
 };
 const $=s=>document.querySelector(s),app=$('#app'),nav=$('#nav'),toast=$('#toast');
@@ -53,7 +53,7 @@ function save(){localStorage.setItem('one-set-v1',JSON.stringify(d))}
 function nextPlan(){let w=d.workouts?.at(-1);return w?.plan==='A'?'B':'A'}
 function last(ex){for(let i=d.workouts.length-1;i>=0;i--){let r=d.workouts[i].sets.find(x=>x.id===ex[0]);if(r)return r}return null}
 function suggested(ex){let l=last(ex);if(!l)return 0;return l.reps>=ex[3]?l.weight+increment(ex):l.weight}
-function increment(ex){return ['incline','lateral','ohp'].includes(ex[0])?5:ex[0]==='dip'?5:10}
+function increment(ex){return ['incline','lateral','ohp','rear'].includes(ex[0])?5:ex[0]==='dip'?5:10}
 function fmt(n){n=Number(n)||0;return Number.isInteger(n)?n:n.toFixed(1)}
 function clock(sec){sec=Math.max(0,Math.ceil(sec));return`${String(Math.floor(sec/60)).padStart(2,'0')}:${String(sec%60).padStart(2,'0')}`}
 function current(){return R[d.session.plan][d.session.i]}
@@ -78,13 +78,4 @@ function alertRest(){beep();if(navigator.vibrate&&d.settings.vibrate)navigator.v
 function beep(){if(!d.settings.sound)return;try{let c=new AudioContext(),o=c.createOscillator(),g=c.createGain();o.frequency.value=880;g.gain.value=.08;o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+.16)}catch{}}
 function workoutById(id){return d.workouts.find(w=>w.id===id)}
 function renderHistory(){view='history';let ws=[...d.workouts].reverse();app.innerHTML=`<section class=hero><p class=eyebrow>LOGBOOK</p><h1>History</h1></section><div class=history>${ws.length?ws.map(w=>`<details><summary><span>Workout ${w.plan} · ${new Date(w.ended).toLocaleDateString()} · ${Math.max(1,Math.round((w.ended-w.started)/60000))} min</span><span class=history-actions><button data-edit-workout="${w.id}">Edit</button><button class=delete data-delete-workout="${w.id}">Delete</button></span></summary>${w.sets.map(x=>`<div class=row><span>${x.name}</span><strong>${fmt(x.weight)} lb × ${x.reps}</strong></div>`).join('')}</details>`).join(''):'<section class=card><h2>No workouts yet.</h2><p class=muted>Your first session will appear here.</p></section>'}</div>`}
-function renderEditWorkout(){let w=workoutById(editId);if(!w){view='history';return renderHistory()}let local=new Date(w.ended-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16);app.innerHTML=`<section class=hero compact><p class=eyebrow>EDIT LOG</p><h1>Workout ${w.plan}</h1></section><section class=card edit-card><label class=edit-date>Date & time<input data-edit-date type=datetime-local value="${local}"></label><div class=edit-sets>${w.sets.map((x,i)=>`<div class=edit-set><div><strong>${x.name}</strong>${howtoLink(x.id,'form')}</div><label>lb<input data-edit-weight=${i} type=number inputmode=decimal step=.5 value="${fmt(x.weight)}"></label><label>reps<input data-edit-reps=${i} type=number inputmode=numeric min=1 value="${x.reps}"></label><button class=icon-danger data-delete-set=${i} aria-label="Delete ${x.name}">×</button></div>`).join('')}</div><div class=edit-actions><button data-cancel-edit>Cancel</button><button class=primary data-save-edit>Save changes</button></div><button class=danger data-delete-workout="${w.id}">Delete this workout</button></section>`}
-function saveWorkoutEdit(){let w=workoutById(editId);if(!w)return;document.querySelectorAll('[data-edit-weight]').forEach(el=>{let i=Number(el.dataset.editWeight);if(w.sets[i])w.sets[i].weight=Math.max(0,Number(el.value)||0)});document.querySelectorAll('[data-edit-reps]').forEach(el=>{let i=Number(el.dataset.editReps);if(w.sets[i])w.sets[i].reps=Math.max(1,Math.round(Number(el.value)||1))});let date=$('[data-edit-date]')?.value;if(date){let ended=new Date(date).getTime();if(Number.isFinite(ended)){let duration=Math.max(0,w.ended-w.started);w.ended=ended;w.started=ended-duration;w.sets.forEach((s,i)=>{s.at=Math.min(ended,w.started+((i+1)/(w.sets.length+1))*duration)})}}save();plan=nextPlan();view='history';editId=null;toastMsg('Workout updated.');render()}
-function deleteWorkout(id){let w=workoutById(id);if(!w)return;if(!confirm(`Delete Workout ${w.plan} from ${new Date(w.ended).toLocaleDateString()}?`))return;d.workouts=d.workouts.filter(x=>x.id!==id);save();plan=nextPlan();editId=null;view='history';toastMsg('Workout deleted.');render()}
-function deleteSet(i){let w=workoutById(editId);if(!w||!w.sets[i])return;let name=w.sets[i].name;if(!confirm(`Delete ${name} from this workout?`))return;w.sets.splice(i,1);save();renderEditWorkout()}
-function renderSettings(){view='settings';app.innerHTML=`<section class=hero><p class=eyebrow>DEFAULTS</p><h1>Settings</h1></section><section class=card><div class=setting><span>Compound recovery <small class=muted>seconds</small></span><input data-setting=compound type=number value=${d.settings.compound}></div><div class=setting><span>Isolation recovery <small class=muted>seconds</small></span><input data-setting=iso type=number value=${d.settings.iso}></div><div class=setting><span>Pre-exhaust transition <small class=muted>seconds</small></span><input data-setting=transition type=number value=${d.settings.transition}></div><div class=setting><span>Sound</span><input data-setting=sound type=checkbox ${d.settings.sound?'checked':''}></div><div class=setting><span>Vibration</span><input data-setting=vibrate type=checkbox ${d.settings.vibrate?'checked':''}></div><button class=danger data-reset>Erase local logbook</button></section>`}
-document.addEventListener('click',e=>{let b=e.target.closest('button');if(!b)return;if(b.dataset.view){view=b.dataset.view;render();return}if(b.dataset.plan){plan=b.dataset.plan;renderHome();return}if(b.hasAttribute('data-start'))startWorkout();else if(b.hasAttribute('data-startset'))startSet();else if(b.dataset.reps)record(Number(b.dataset.reps));else if(b.dataset.weight){d.session.weight=Math.max(0,(Number(d.session.weight)||0)+Number(b.dataset.weight)*increment(current()));save();render()}else if(b.hasAttribute('data-skip'))skip();else if(b.hasAttribute('data-undo'))undo();else if(b.hasAttribute('data-cancel')){d.session.phase='ready';save();render()}else if(b.hasAttribute('data-other')){let n=Number(prompt('Actual reps?'));if(n>0)record(n)}else if(b.hasAttribute('data-finish')){if(d.session.sets.length&&confirm('Finish and save completed sets?'))complete()}else if(b.dataset.editWorkout){editId=b.dataset.editWorkout;view='edit';render()}else if(b.dataset.deleteWorkout)deleteWorkout(b.dataset.deleteWorkout);else if(b.dataset.deleteSet!==undefined)deleteSet(Number(b.dataset.deleteSet));else if(b.hasAttribute('data-save-edit'))saveWorkoutEdit();else if(b.hasAttribute('data-cancel-edit')){editId=null;view='history';render()}else if(b.hasAttribute('data-reset')&&confirm('Erase all workout history?')){d.workouts=[];d.session=null;save();plan='A';render()}});
-document.addEventListener('input',e=>{if(e.target.matches('[data-weightinput]')){d.session.weight=Number(e.target.value)||0;save()}});
-document.addEventListener('change',e=>{let k=e.target.dataset.setting;if(!k)return;d.settings[k]=e.target.type==='checkbox'?e.target.checked:Number(e.target.value);save()});
-if('serviceWorker'in navigator)addEventListener('load',()=>navigator.serviceWorker.register('./sw.js'));
-render();
+function renderEditWorkout(){let w=workoutById(editId);if(!w){view='history';return renderHistory()}let local=new Date(w.ended-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16);app.innerHTML=`<section class=hero compact><p class=eyebrow>EDIT LOG</p><h1>Workout ${w.plan}</h1></section><section class=card edit-card><label class=edit-date>Date & time<input data-edit-date type=datetime-local value="${local}"></label><div class=edit-sets>${w.sets.map((x,i)=>`<div class=edit-set><div><strong>${x.name}</strong>${howtoLink(x.id,'form')}</div><label>lb<input data-edit-weight=${i} type=number inputmode=decimal step=.5 value="${fmt(x.weight)}"></label><label>reps<input data-edit-reps=${i} type=number inputmode=numeric min=1 value="${x.reps}"></label><button class=icon-danger data-delete-set=${i} aria-label="Delete ${x.name}">×</button></div>`).join('')}</div><div
